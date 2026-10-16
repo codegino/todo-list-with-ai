@@ -1,7 +1,7 @@
-const apiKey = process.env.OPENAI_API_KEY;
+const apiKey = process.env.OPENROUTER_API_KEY;
 
 if (!apiKey) {
-  throw new Error('OPENAI_API_KEY is not set. Copy .env.example to .env.');
+  throw new Error('OPENROUTER_API_KEY is not set. Copy .env.example to .env.');
 }
 
 /**
@@ -11,9 +11,9 @@ if (!apiKey) {
  * but it would also hide how small this surface actually is — and this repo
  * queries Postgres with plain SQL for the same reason.
  */
-const ENDPOINT = 'https://api.openai.com/v1/embeddings';
+const ENDPOINT = 'https://openrouter.ai/api/v1/embeddings';
 
-export const EMBEDDING_MODEL = 'text-embedding-3-small';
+export const EMBEDDING_MODEL = 'openai/text-embedding-3-small';
 
 /**
  * Must match `vector(1536)` in migrations/002_embeddings.sql. Postgres will
@@ -53,14 +53,14 @@ export async function embed(text: string): Promise<number[]> {
   });
 
   if (!response.ok) {
-    throw new Error(`OpenAI embeddings failed: ${response.status} ${await response.text()}`);
+    throw new Error(`OpenRouter embeddings failed: ${response.status} ${await response.text()}`);
   }
 
   const payload = (await response.json()) as EmbeddingsResponse;
   const [item] = payload.data;
 
   if (!item) {
-    throw new Error('OpenAI returned no embedding');
+    throw new Error('OpenRouter returned no embedding');
   }
 
   return item.embedding;
@@ -89,7 +89,7 @@ export async function embedMany(texts: string[]): Promise<number[][]> {
   });
 
   if (!response.ok) {
-    throw new Error(`OpenAI embeddings failed: ${response.status} ${await response.text()}`);
+    throw new Error(`OpenRouter embeddings failed: ${response.status} ${await response.text()}`);
   }
 
   const payload = (await response.json()) as EmbeddingsResponse;

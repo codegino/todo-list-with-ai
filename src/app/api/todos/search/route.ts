@@ -48,7 +48,7 @@ export async function GET(request: Request) {
   try {
     const rows = await sql<SearchResultRow[]>`
       select
-        id, title, completed, created_at,
+        id, title, completed, tags, created_at,
         1 - (embedding <=> ${queryVector}::vector) as similarity
       from todos
       where embedding is not null

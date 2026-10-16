@@ -4,6 +4,7 @@ import {sql} from '@/db';
 import type {TodoRow} from '@/db/types';
 import {createTodoSchema, invalidRequest} from '@/lib/api-contract';
 import {embed, toVector} from '@/lib/embeddings';
+import {classify, type Tag} from '@/lib/tags';
 
 export const runtime = 'nodejs';
 
@@ -14,7 +15,7 @@ export async function GET() {
     // the UI never reads and `todoSchema` would silently strip. Adding a wide
     // column is exactly when `select *` becomes a bandwidth bug.
     const rows = await sql<TodoRow[]>`
-      select id, title, completed, created_at
+      select id, title, completed, tags, created_at
       from todos
       order by created_at desc
     `;
@@ -42,11 +43,28 @@ export async function POST(request: Request) {
 
   const {title} = parsed.data;
 
+  /**
+   * Unlike the embedding below, tagging happens *before* the insert, so the
+   * todo comes back with its tags already on it. That is only acceptable
+   * because a decision model answers in a few hundred milliseconds, and
+   * because failure is not fatal: on an error or a 3s timeout the todo is
+   * inserted with `tags = null` ("never classified") and simply shows no
+   * tags.
+   */
+  let tags: Tag[] | null = null;
+
+  try {
+    tags = await classify(title);
+  } catch (error) {
+    // oxlint-disable-next-line no-console -- the only signal this failed
+    console.error(`Failed to classify "${title}"`, error);
+  }
+
   try {
     const [created] = await sql<TodoRow[]>`
-      insert into todos (title)
-      values (${title})
-      returning id, title, completed, created_at
+      insert into todos (title, tags)
+      values (${title}, ${tags})
+      returning id, title, completed, tags, created_at
     `;
 
     /**

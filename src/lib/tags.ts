@@ -5,17 +5,18 @@ if (!apiKey) {
 }
 
 /**
- * The labels, and when each one applies. That is the whole configuration.
+ * The labels, each with the yes/no question the model answers for it. That is
+ * the whole configuration.
  *
- * The "choose when" text is what the model actually reads, so it is worth more
- * care than the key. A real app would keep these in a `labels` table; three
- * fixed labels do not need one.
+ * The question is what the model actually reads, so it is worth more care than
+ * the key. A real app would keep these in a `labels` table; three fixed labels
+ * do not need one.
  */
 export const TAGS = {
-  groceries: 'Buying food, drinks, or household supplies from a store or market.',
+  groceries: 'Is this about buying food, drinks, or household supplies from a store or market?',
   chores:
-    'A task done in or around the home, like cleaning, laundry, dishes, cooking, repairs, or taking out the trash.',
-  work: 'Related to a job or career, like meetings, reports, emails to colleagues, or deadlines.',
+    'Is this a task done in or around the home, like cleaning, laundry, dishes, cooking, repairs, or taking out the trash?',
+  work: 'Is this related to a job or career, like meetings, reports, emails to colleagues, or deadlines?',
 } as const;
 
 export type Tag = keyof typeof TAGS;
@@ -23,7 +24,7 @@ export type Tag = keyof typeof TAGS;
 /**
  * A tag is attached when the model says it applies with at least this
  * probability. Picked by eye on a handful of todos, the same way the search
- * cutoff was. "Buy dish soap" scores ~0.7 for chores, right on the line.
+ * cutoff was.
  */
 export const TAG_THRESHOLD = 0.7;
 
@@ -51,13 +52,7 @@ type DecisionsResponse = {
  * tags.
  */
 const questions = Object.fromEntries(
-  Object.entries(TAGS).map(([tag, chooseWhen]) => [
-    tag,
-    {
-      type: 'noul',
-      instructions: `Does the todo belong in "${tag}"? Choose it when: ${chooseWhen}`,
-    },
-  ]),
+  Object.entries(TAGS).map(([tag, question]) => [tag, {type: 'noul', instructions: question}]),
 );
 
 /**
@@ -70,7 +65,7 @@ export async function classify(title: string): Promise<Tag[]> {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${apiKey}`,
     },
-    body: JSON.stringify({model: TAG_MODEL, state: {title}, questions}),
+    body: JSON.stringify({model: TAG_MODEL, state: title, questions}),
     signal: AbortSignal.timeout(TIMEOUT_MS),
   });
 

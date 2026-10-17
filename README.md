@@ -200,7 +200,7 @@ than generated text, so there is nothing to parse and no output tokens to pay
 for.
 
 1. **The labels.** `TAGS` in `src/lib/tags.ts` is a plain object: each key is a
-   tag and each value is a "choose when" sentence the model reads. A real app
+   tag and each value is the yes/no question the model answers for it. A real app
    would keep these in a `labels` table; three fixed labels do not need one.
 2. **On create.** `POST /api/todos` asks one yes/no (`noul`) question per tag in
    a single request, keeps every tag at or above `TAG_THRESHOLD` (0.7), and
@@ -282,8 +282,7 @@ scan. Correct and fast at this size, and it stops mattering somewhere in the
 tens of thousands of rows — see the comment in `002_embeddings.sql`.
 
 **0.7 is a magic number too.** The tag threshold was picked by eye on a
-handful of todos. "Buy dish soap" scores right around 0.7 for `chores` and
-flips between runs.
+handful of todos. Check it against a few dozen hand-labelled rows of your own.
 
 **Tagging failures are permanent.** A todo that hits the fallback stays
 untagged; there is no retry or backfill for tags. Delete and re-add it, or add

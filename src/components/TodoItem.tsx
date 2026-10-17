@@ -27,6 +27,16 @@ function TodoItem({todo, onToggle, onDelete}: TodoItemProps) {
         {todo.title}
       </p>
 
+      {/* null (never classified) and [] (nothing matched) both render nothing. */}
+      {todo.tags?.map(tag => (
+        <span
+          key={tag}
+          className="shrink-0 rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-600"
+        >
+          {tag}
+        </span>
+      ))}
+
       <button
         type="button"
         onClick={onDelete}

@@ -11,6 +11,8 @@ export const todoSchema = z.object({
   id: z.uuid(),
   title: z.string(),
   completed: z.boolean(),
+  // null: never classified. []: classified, nothing passed the threshold.
+  tags: z.array(z.string()).nullable(),
   createdAt: z.iso.datetime(),
 });
 

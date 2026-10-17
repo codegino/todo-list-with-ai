@@ -51,6 +51,14 @@ Run the migrations in order:
 ```sh
 psql "$DATABASE_URL" -f migrations/001_init.sql
 psql "$DATABASE_URL" -f migrations/002_embeddings.sql
+psql "$DATABASE_URL" -f migrations/003_tags.sql
+```
+
+Or, on a fresh database (or to start over), run the one script that drops the
+table and recreates it with every column. **It deletes all todos.**
+
+```sh
+psql "$DATABASE_URL" -f migrations/reset.sql
 ```
 
 Or paste them into whatever SQL console your provider gives you.
@@ -183,15 +191,42 @@ shipping derived data at all.
 It is a distant third, but the endpoint also recovers todos whose embedding
 call failed at write time — see the caveats below.
 
+## How the classification works
+
+Every todo is tagged with zero or more of `groceries`, `chores`, and `work` by
+[Jev](https://openrouter.ai/typesafe/jev-1.14), a decision model, through the
+same OpenRouter key. A decision model returns a probability per question rather
+than generated text, so there is nothing to parse and no output tokens to pay
+for.
+
+1. **The labels.** `TAGS` in `src/lib/tags.ts` is a plain object: each key is a
+   tag and each value is the yes/no question the model answers for it. A real app
+   would keep these in a `labels` table; three fixed labels do not need one.
+2. **On create.** `POST /api/todos` asks one yes/no (`noul`) question per tag in
+   a single request, keeps every tag at or above `TAG_THRESHOLD` (0.7), and
+   inserts the todo with them. This call is _before_ the insert, unlike the
+   embedding, because it answers in a few hundred milliseconds.
+3. **On failure.** The call has a 3 second timeout. If it errors or times out,
+   the todo is still created, with `tags = null`, and the error is logged.
+   `null` means "never classified"; `'{}'` means "classified, nothing matched".
+4. **In the UI.** Each todo shows its tags as small chips next to the title.
+   Untagged todos show nothing.
+
+The model is pinned to `typesafe/jev-1.14`, not `~typesafe/jev-latest`: the
+threshold is tuned to one model's probabilities.
+
 ## Layout
 
 ```
 migrations/001_init.sql        the schema
 migrations/002_embeddings.sql  pgvector + the embedding column
+migrations/003_tags.sql        the tags column
+migrations/reset.sql           drop + recreate the final schema in one go
 src/db/index.ts                postgres client (hot-reload safe singleton)
 src/db/types.ts                row types, hand-written to match the SQL
 src/lib/api-contract.ts        Zod schemas + the shape of the 400 they produce
 src/lib/embeddings.ts          the OpenAI call, and the pgvector cast helper
+src/lib/tags.ts                the labels, the threshold, and the Jev call
 src/app/api/todos/             route handlers
 src/components/TodoApp.tsx     the whole UI: list, add, and both searches
 ```
@@ -245,6 +280,17 @@ where the useful results stop and retune it.
 **There is no index on the vector column**, so search is an exact sequential
 scan. Correct and fast at this size, and it stops mattering somewhere in the
 tens of thousands of rows — see the comment in `002_embeddings.sql`.
+
+**0.7 is a magic number too.** The tag threshold was picked by eye on a
+handful of todos. Check it against a few dozen hand-labelled rows of your own.
+
+**Tagging failures are permanent.** A todo that hits the fallback stays
+untagged; there is no retry or backfill for tags. Delete and re-add it, or add
+a backfill like the embedding one if you need it.
+
+**Only the tags are stored, not the probabilities.** Re-tuning the threshold
+means calling the model again. Store the raw scores (e.g. a `jsonb` column) if
+you expect to tune it often.
 
 **Titles are never re-embedded**, because there is no way to edit a title. Add
 one and you will need to re-embed on update, or the vector silently describes
